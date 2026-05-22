@@ -408,7 +408,10 @@ export function runDbHealthCheck(
   const autoRepair = options.autoRepair === true;
   const expectedSchemaVersion = options.expectedSchemaVersion || "1";
   const checkedAt = new Date().toISOString();
+  let _t0 = Date.now();
+  let _t = _t0;
   const validConnectionIds = loadValidConnectionIds(db);
+  console.log(`[timing] loadValidConnectionIds: ${Date.now() - _t}ms`);
   const issues: DbHealthIssue[] = [];
   let repairedCount = 0;
   let backupCreated = false;
@@ -426,7 +429,9 @@ export function runDbHealthCheck(
   // does a full page-by-page scan that can take minutes on a fragmented WAL,
   // causing 7+ minute boot times. quick_check still catches corruption but
   // skips deep index verification, reducing I/O to seconds.
+  _t = Date.now();
   const integrityCheck = db.pragma("quick_check") as Array<{ quick_check?: string }>;
+  console.log(`[timing] quick_check: ${Date.now() - _t}ms`);
   if (integrityCheck[0]?.quick_check !== "ok") {
     issues.push({
       type: "integrity_check_failed",
@@ -436,13 +441,16 @@ export function runDbHealthCheck(
     });
   }
 
+  _t = Date.now();
   if (hasRows(db, "combos")) {
     const comboRows = db
       .prepare(
         "SELECT id, name, data, sort_order, created_at, updated_at FROM combos ORDER BY name COLLATE NOCASE ASC"
       )
       .all() as ComboRow[];
+    console.log(`[timing]   combos SELECT: ${Date.now() - _t}ms`);
     const comboRepair = repairComboRows(db, comboRows, checkedAt, { autoRepair, validConnectionIds });
+    console.log(`[timing]   combos repairComboRows: ${Date.now() - _t}ms`);
     if (comboRepair.issueCount > 0) {
       issues.push({
         type: "broken_reference",
@@ -456,9 +464,13 @@ export function runDbHealthCheck(
         repairedCount += comboRepair.repairedCount;
       }
     }
+  } else {
+    console.log(`[timing]   combos: table not found (${Date.now() - _t}ms)`);
   }
 
+  _t = Date.now();
   const orphanQuotaCount = countOrphanQuotaSnapshots(db, validConnectionIds);
+  console.log(`[timing] quota_snapshots count: ${Date.now() - _t}ms`);
   if (orphanQuotaCount > 0) {
     issues.push({
       type: "stale_snapshot",
@@ -469,11 +481,15 @@ export function runDbHealthCheck(
     });
     if (autoRepair) {
       ensureBackupBeforeRepair();
+      _t = Date.now();
       repairedCount += repairQuotaSnapshots(db, validConnectionIds);
+      console.log(`[timing]   quota_snapshots repair: ${Date.now() - _t}ms`);
     }
   }
 
+  _t = Date.now();
   const orphanBudgets = countOrphanDomainRows(db, "domain_budgets");
+  console.log(`[timing] domain_budgets count: ${Date.now() - _t}ms`);
   if (orphanBudgets > 0) {
     issues.push({
       type: "broken_reference",
@@ -483,11 +499,15 @@ export function runDbHealthCheck(
     });
     if (autoRepair) {
       ensureBackupBeforeRepair();
+      _t = Date.now();
       repairedCount += repairOrphanDomainRows(db, "domain_budgets");
+      console.log(`[timing]   domain_budgets repair: ${Date.now() - _t}ms`);
     }
   }
 
+  _t = Date.now();
   const orphanCostHistory = countOrphanDomainRows(db, "domain_cost_history");
+  console.log(`[timing] domain_cost_history count: ${Date.now() - _t}ms`);
   if (orphanCostHistory > 0) {
     issues.push({
       type: "broken_reference",
@@ -497,11 +517,15 @@ export function runDbHealthCheck(
     });
     if (autoRepair) {
       ensureBackupBeforeRepair();
+      _t = Date.now();
       repairedCount += repairOrphanDomainRows(db, "domain_cost_history");
+      console.log(`[timing]   domain_cost_history repair: ${Date.now() - _t}ms`);
     }
   }
 
+  _t = Date.now();
   const invalidFallbackChains = countInvalidJsonRows(db, "domain_fallback_chains", "chain");
+  console.log(`[timing] domain_fallback_chains count: ${Date.now() - _t}ms`);
   if (invalidFallbackChains > 0) {
     issues.push({
       type: "invalid_state",
@@ -511,11 +535,15 @@ export function runDbHealthCheck(
     });
     if (autoRepair) {
       ensureBackupBeforeRepair();
+      _t = Date.now();
       repairedCount += repairInvalidJsonRows(db, "domain_fallback_chains", "chain");
+      console.log(`[timing]   domain_fallback_chains repair: ${Date.now() - _t}ms`);
     }
   }
 
+  _t = Date.now();
   const invalidLockoutState = countInvalidJsonRows(db, "domain_lockout_state", "attempts");
+  console.log(`[timing] domain_lockout_state count: ${Date.now() - _t}ms`);
   if (invalidLockoutState > 0) {
     issues.push({
       type: "invalid_state",
@@ -525,11 +553,15 @@ export function runDbHealthCheck(
     });
     if (autoRepair) {
       ensureBackupBeforeRepair();
+      _t = Date.now();
       repairedCount += repairInvalidJsonRows(db, "domain_lockout_state", "attempts");
+      console.log(`[timing]   domain_lockout_state repair: ${Date.now() - _t}ms`);
     }
   }
 
+  _t = Date.now();
   const invalidBreakerOptions = countInvalidJsonRows(db, "domain_circuit_breakers", "options");
+  console.log(`[timing] domain_circuit_breakers count: ${Date.now() - _t}ms`);
   if (invalidBreakerOptions > 0) {
     issues.push({
       type: "invalid_state",
@@ -539,11 +571,15 @@ export function runDbHealthCheck(
     });
     if (autoRepair) {
       ensureBackupBeforeRepair();
+      _t = Date.now();
       repairedCount += repairInvalidJsonRows(db, "domain_circuit_breakers", "options");
+      console.log(`[timing]   domain_circuit_breakers repair: ${Date.now() - _t}ms`);
     }
   }
 
+  _t = Date.now();
   const schemaVersionIssues = getSchemaVersionIssueCount(db, expectedSchemaVersion);
+  console.log(`[timing] schema_version check: ${Date.now() - _t}ms`);
   if (schemaVersionIssues > 0) {
     issues.push({
       type: "invalid_state",
@@ -553,10 +589,13 @@ export function runDbHealthCheck(
     });
     if (autoRepair) {
       ensureBackupBeforeRepair();
+      _t = Date.now();
       repairedCount += repairSchemaVersion(db, expectedSchemaVersion);
+      console.log(`[timing]   schema_version repair: ${Date.now() - _t}ms`);
     }
   }
 
+  console.log(`[timing] total health check: ${Date.now() - _t0}ms`);
   return {
     isHealthy: issues.length === 0,
     issues,
