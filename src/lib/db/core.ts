@@ -1133,6 +1133,12 @@ export function getDbInstance(): SqliteDatabase {
   const existing = getDb();
   if (existing) return existing;
 
+  const t0 = performance.now();
+  const step = (name: string) => {
+    const elapsed = ((performance.now() - t0) / 1000).toFixed(1);
+    console.log(`[DB] getDbInstance: ${name} (+${elapsed}s)`);
+  };
+
   if (isCloud || isBuildPhase) {
     if (isBuildPhase) {
       console.log("[DB] Build phase detected — using in-memory SQLite (read-only)");
@@ -1144,6 +1150,7 @@ export function getDbInstance(): SqliteDatabase {
     ensureCallLogsColumns(memoryDb);
     ensureProviderConnectionsColumns(memoryDb);
     setDb(memoryDb);
+    step("in-memory db ready");
     return memoryDb;
   }
 
@@ -1201,6 +1208,7 @@ export function getDbInstance(): SqliteDatabase {
         `[DB] Could not preserve critical DB state before recreation: ${preservedCriticalState.captureError}`
       );
     }
+    step("capture critical state");
   }
 
   // Track whether the DB file is brand new (fresh DATA_DIR / Docker volume).
@@ -1300,6 +1308,8 @@ export function getDbInstance(): SqliteDatabase {
     }
   }
 
+  step("probe done");
+
   const db = openSqliteDatabase(sqliteFile);
   db.pragma("journal_mode = WAL");
   db.pragma("busy_timeout = 5000");
@@ -1322,9 +1332,13 @@ export function getDbInstance(): SqliteDatabase {
     VALUES ('001', 'initial_schema');
   `);
 
+  step("schema applied");
+
   runMigrations(db, { isNewDb });
 
   offloadLegacyCallLogDetails(db);
+
+  step("migrations done");
 
   // Auto-migrate from db.json if exists
   if (jsonDbFile && fs.existsSync(jsonDbFile)) {
@@ -1368,6 +1382,8 @@ export function getDbInstance(): SqliteDatabase {
     });
   }
 
+  step("health check done");
+
   setDb(db);
 
   // Re-encrypt any tokens using the legacy dynamic salt to canonical static salt
@@ -1379,6 +1395,7 @@ export function getDbInstance(): SqliteDatabase {
   }
 
   startDbHealthCheckScheduler(db);
+  step("ready");
   console.log(`[DB] SQLite database ready: ${sqliteFile}`);
   return db;
 }
