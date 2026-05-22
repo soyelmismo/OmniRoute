@@ -17,7 +17,8 @@ RUN if [ -f package-lock.json ]; then \
     fi
 
 COPY . ./
-RUN mkdir -p /app/data && npm run build -- --webpack
+RUN --mount=type=cache,target=/app/.next/cache \
+    mkdir -p /app/data && npm run build -- --webpack
 
 FROM node:26.2.0-trixie-slim AS runner-base
 WORKDIR /app
