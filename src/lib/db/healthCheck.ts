@@ -407,8 +407,12 @@ export function runDbHealthCheck(
     backupCreated = options.createBackupBeforeRepair();
   };
 
-  const integrityCheck = db.pragma("integrity_check") as Array<{ integrity_check?: string }>;
-  if (integrityCheck[0]?.integrity_check !== "ok") {
+  // Use quick_check instead of integrity_check on startup — integrity_check
+  // does a full page-by-page scan that can take minutes on a fragmented WAL,
+  // causing 7+ minute boot times. quick_check still catches corruption but
+  // skips deep index verification, reducing I/O to seconds.
+  const integrityCheck = db.pragma("quick_check") as Array<{ quick_check?: string }>;
+  if (integrityCheck[0]?.quick_check !== "ok") {
     issues.push({
       type: "integrity_check_failed",
       table: "sqlite",
