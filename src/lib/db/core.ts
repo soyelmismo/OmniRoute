@@ -1375,21 +1375,13 @@ export function getDbInstance(): SqliteDatabase {
   );
   versionStmt.run();
   if (shouldRunStartupDbHealthCheck()) {
-    // Defer health check to avoid I/O contention during boot on slow storage.
-    // quick_check competes with WAL checkpoint and other startup I/O on the
-    // same HDD, inflating a <1s check to minutes when run synchronously.
-    setTimeout(() => {
-      try {
-        runDbHealthCheck(db, {
-          autoRepair: true,
-          expectedSchemaVersion: "1",
-          createBackupBeforeRepair: () => createHealthCheckBackup(db),
-        });
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        console.warn("[DB] Background health check failed:", message);
-      }
-    }, 0);
+    const skipIntegrityCheck = process.env.OMNIROUTE_SKIP_DB_HEALTHCHECK === "1";
+    runDbHealthCheck(db, {
+      autoRepair: true,
+      expectedSchemaVersion: "1",
+      skipIntegrityCheck,
+      createBackupBeforeRepair: () => createHealthCheckBackup(db),
+    });
   }
 
   step("health check done");
