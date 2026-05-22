@@ -92,6 +92,13 @@ function hasProviderConnection(db: SqliteDatabase, connectionId: string): boolea
   return row?.ok === 1;
 }
 
+function loadValidConnectionIds(db: SqliteDatabase): Set<string> {
+  const rows = db
+    .prepare("SELECT id FROM provider_connections")
+    .all() as Array<{ id: string }>;
+  return new Set(rows.map((row) => row.id));
+}
+
 function isValidIsoTimestamp(value: unknown): boolean {
   if (typeof value !== "string" || value.trim().length === 0) return false;
   return !Number.isNaN(Date.parse(value));
@@ -127,7 +134,7 @@ function repairComboRows(
   db: SqliteDatabase,
   rows: ComboRow[],
   checkedAt: string,
-  options: { autoRepair: boolean }
+  options: { autoRepair: boolean; validConnectionIds?: Set<string> }
 ): ComboRepairResult {
   if (rows.length === 0) return { issueCount: 0, repairedCount: 0 };
 
@@ -193,12 +200,17 @@ function repairComboRows(
       }
 
       const connectionId = toTrimmedString(rawStep.connectionId);
-      if (connectionId && !hasProviderConnection(db, connectionId)) {
-        const repairedStep = { ...rawStep };
-        delete repairedStep.connectionId;
-        nextModels.push(repairedStep);
-        clearedConnectionPins += 1;
-        continue;
+      if (connectionId) {
+        const connectionExists = options.validConnectionIds
+          ? options.validConnectionIds.has(connectionId)
+          : hasProviderConnection(db, connectionId);
+        if (!connectionExists) {
+          const repairedStep = { ...rawStep };
+          delete repairedStep.connectionId;
+          nextModels.push(repairedStep);
+          clearedConnectionPins += 1;
+          continue;
+        }
       }
 
       nextModels.push(rawStep);
@@ -239,7 +251,7 @@ function repairComboRows(
   return { issueCount, repairedCount };
 }
 
-function getBrokenQuotaSnapshotRowIds(db: SqliteDatabase): number[] {
+function getBrokenQuotaSnapshotRowIds(db: SqliteDatabase, validConnectionIds?: Set<string>): number[] {
   if (!hasRows(db, "quota_snapshots")) return [];
 
   const brokenRowIds = new Set<number>();
@@ -249,7 +261,9 @@ function getBrokenQuotaSnapshotRowIds(db: SqliteDatabase): number[] {
 
   for (const row of rows) {
     const connectionId = toTrimmedString(row.connection_id);
-    const missingConnection = !!connectionId && !hasProviderConnection(db, connectionId);
+    const missingConnection = !!connectionId && (
+      validConnectionIds ? !validConnectionIds.has(connectionId) : !hasProviderConnection(db, connectionId)
+    );
     const invalidTimestamp = !isValidIsoTimestamp(row.created_at);
     if ((missingConnection || invalidTimestamp) && typeof row.id === "number") {
       brokenRowIds.add(row.id);
@@ -259,13 +273,13 @@ function getBrokenQuotaSnapshotRowIds(db: SqliteDatabase): number[] {
   return Array.from(brokenRowIds);
 }
 
-function countOrphanQuotaSnapshots(db: SqliteDatabase): number {
-  return getBrokenQuotaSnapshotRowIds(db).length;
+function countOrphanQuotaSnapshots(db: SqliteDatabase, validConnectionIds?: Set<string>): number {
+  return getBrokenQuotaSnapshotRowIds(db, validConnectionIds).length;
 }
 
-function repairQuotaSnapshots(db: SqliteDatabase): number {
+function repairQuotaSnapshots(db: SqliteDatabase, validConnectionIds?: Set<string>): number {
   if (!hasRows(db, "quota_snapshots")) return 0;
-  const brokenRowIds = getBrokenQuotaSnapshotRowIds(db);
+  const brokenRowIds = getBrokenQuotaSnapshotRowIds(db, validConnectionIds);
   if (brokenRowIds.length === 0) return 0;
 
   const deleteByRowId = db.prepare("DELETE FROM quota_snapshots WHERE id = ?");
@@ -394,6 +408,7 @@ export function runDbHealthCheck(
   const autoRepair = options.autoRepair === true;
   const expectedSchemaVersion = options.expectedSchemaVersion || "1";
   const checkedAt = new Date().toISOString();
+  const validConnectionIds = loadValidConnectionIds(db);
   const issues: DbHealthIssue[] = [];
   let repairedCount = 0;
   let backupCreated = false;
@@ -427,7 +442,7 @@ export function runDbHealthCheck(
         "SELECT id, name, data, sort_order, created_at, updated_at FROM combos ORDER BY name COLLATE NOCASE ASC"
       )
       .all() as ComboRow[];
-    const comboRepair = repairComboRows(db, comboRows, checkedAt, { autoRepair });
+    const comboRepair = repairComboRows(db, comboRows, checkedAt, { autoRepair, validConnectionIds });
     if (comboRepair.issueCount > 0) {
       issues.push({
         type: "broken_reference",
@@ -443,7 +458,7 @@ export function runDbHealthCheck(
     }
   }
 
-  const orphanQuotaCount = countOrphanQuotaSnapshots(db);
+  const orphanQuotaCount = countOrphanQuotaSnapshots(db, validConnectionIds);
   if (orphanQuotaCount > 0) {
     issues.push({
       type: "stale_snapshot",
@@ -454,7 +469,7 @@ export function runDbHealthCheck(
     });
     if (autoRepair) {
       ensureBackupBeforeRepair();
-      repairedCount += repairQuotaSnapshots(db);
+      repairedCount += repairQuotaSnapshots(db, validConnectionIds);
     }
   }
 
