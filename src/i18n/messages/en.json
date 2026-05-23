@@ -924,6 +924,8 @@
     "settingsAdvancedSubtitle": "Power user options",
     "settingsSecuritySubtitle": "Auth and encryption",
     "settingsFeatureFlagsSubtitle": "Toggle system capabilities",
+    "settingsSidebar": "Sidebar",
+    "settingsSidebarSubtitle": "Customize sidebar layout",
     "settingsAuthzSubtitle": "Route inventory and bypass policy",
     "docsSubtitle": "Documentation",
     "issuesSubtitle": "Report a bug",
