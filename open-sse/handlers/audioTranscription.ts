@@ -72,7 +72,7 @@ function getUploadedFileName(file: Blob & { name?: unknown }): string {
 async function buildMultipartBody(
   file: Blob & { name?: unknown },
   fields: Record<string, string>
-): Promise<{ body: ArrayBuffer; contentType: string }> {
+): Promise<{ body: Uint8Array; contentType: string }> {
   const boundary = "----OmniRouteAudioBoundary" + Date.now().toString(36);
   const parts: Uint8Array[] = [];
   const encoder = new TextEncoder();
@@ -85,7 +85,7 @@ async function buildMultipartBody(
     );
   }
 
-  const fileName = getUploadedFileName(file);
+  const fileName = getUploadedFileName(file).replace(/["]/g, "_");
   const fileBytes = new Uint8Array(await file.arrayBuffer());
   parts.push(
     encoder.encode(
@@ -103,7 +103,7 @@ async function buildMultipartBody(
     offset += part.length;
   }
 
-  return { body: body.buffer, contentType: `multipart/form-data; boundary=${boundary}` };
+  return { body, contentType: "multipart/form-data; boundary=" + boundary };
 }
 
 /**
