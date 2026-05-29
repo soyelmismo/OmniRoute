@@ -36,6 +36,7 @@ interface RateLimitStatsEntry {
 
 /** @type {Map<string, ModelGate>} */
 const gates = new Map<string, ModelGate>();
+const MAX_GATES = 100;
 
 /**
  * Get or create gate for a model
@@ -44,6 +45,10 @@ const gates = new Map<string, ModelGate>();
  * @returns {ModelGate}
  */
 function getGate(modelStr: string, maxConcurrency = 3): ModelGate {
+  if (!gates.has(modelStr) && gates.size >= MAX_GATES) {
+    const oldestKey = gates.keys().next().value;
+    if (oldestKey !== undefined) gates.delete(oldestKey);
+  }
   if (!gates.has(modelStr)) {
     gates.set(modelStr, {
       running: 0,
@@ -87,6 +92,10 @@ function drainQueue(modelStr: string): void {
     gate.running++;
     next.resolve(createReleaseFn(modelStr));
   }
+
+  if (gate.running === 0 && gate.queue.length === 0) {
+    gates.delete(modelStr);
+  }
 }
 
 /**
@@ -102,6 +111,10 @@ function createReleaseFn(modelStr: string): () => void {
     const gate = gates.get(modelStr);
     if (gate && gate.running > 0) {
       gate.running--;
+      if (gate.running === 0 && gate.queue.length === 0) {
+        gates.delete(modelStr);
+        return;
+      }
       drainQueue(modelStr);
     }
   };

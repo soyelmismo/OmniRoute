@@ -36,10 +36,14 @@ interface SessionBody {
 // key: sessionId → { createdAt, lastActive, requestCount, connectionId? }
 const sessions = new Map<string, SessionEntry>();
 
-// Auto-cleanup sessions older than 30 minutes
-const SESSION_TTL_MS = 30 * 60 * 1000;
+// Hard cap on active sessions to prevent memory exhaustion
+const MAX_SESSIONS = 200;
+
+// Auto-cleanup sessions older than 15 minutes (reduced from 30)
+const SESSION_TTL_MS = 15 * 60 * 1000;
 const _cleanupTimer = setInterval(() => {
   const now = Date.now();
+  // Evict expired sessions
   for (const [key, entry] of sessions) {
     if (now - entry.lastActive > SESSION_TTL_MS) {
       sessions.delete(key);
@@ -49,8 +53,27 @@ const _cleanupTimer = setInterval(() => {
       }
     }
   }
+  // Hard cap: evict oldest if over limit
+  while (sessions.size > MAX_SESSIONS) {
+    let oldestKey: string | null = null;
+    let oldestTime = Infinity;
+    for (const [key, entry] of sessions) {
+      if (entry.lastActive < oldestTime) {
+        oldestTime = entry.lastActive;
+        oldestKey = key;
+      }
+    }
+    if (oldestKey === null) break;
+    sessions.delete(oldestKey);
+    for (const [apiKeyId, sessionSet] of activeSessionsByKey) {
+      sessionSet.delete(oldestKey);
+      if (sessionSet.size === 0) activeSessionsByKey.delete(apiKeyId);
+    }
+  }
 }, 60_000);
-_cleanupTimer.unref();
+if (typeof _cleanupTimer === "object" && "unref" in _cleanupTimer) {
+  (_cleanupTimer as { unref?: () => void }).unref?.();
+}
 
 /**
  * Generate a stable session fingerprint from request characteristics.
