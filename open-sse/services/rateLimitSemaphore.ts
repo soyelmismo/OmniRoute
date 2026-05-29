@@ -36,7 +36,6 @@ interface RateLimitStatsEntry {
 
 /** @type {Map<string, ModelGate>} */
 const gates = new Map<string, ModelGate>();
-const MAX_GATES = 100;
 
 /**
  * Get or create gate for a model
@@ -45,10 +44,6 @@ const MAX_GATES = 100;
  * @returns {ModelGate}
  */
 function getGate(modelStr: string, maxConcurrency = 3): ModelGate {
-  if (!gates.has(modelStr) && gates.size >= MAX_GATES) {
-    const oldestKey = gates.keys().next().value;
-    if (oldestKey !== undefined) gates.delete(oldestKey);
-  }
   if (!gates.has(modelStr)) {
     gates.set(modelStr, {
       running: 0,

@@ -34,7 +34,7 @@ const _mcpSessionSweep = setInterval(() => {
   const now = Date.now();
   for (const [sessionId, session] of _streamableSessions) {
     if (now - session.lastActivityAt > MCP_SESSION_IDLE_MS) {
-      closeStreamableSession(sessionId);
+      try { closeStreamableSession(sessionId); } catch {}
     }
   }
 }, 60_000);

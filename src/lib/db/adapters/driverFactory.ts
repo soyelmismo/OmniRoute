@@ -39,7 +39,10 @@ function buildNodeAdapterSync(
 
   function getCached(sql: string) {
     let entry = stmtCache.get(sql);
-    if (!entry) {
+    if (entry) {
+      stmtCache.delete(sql);
+      stmtCache.set(sql, entry);
+    } else {
       const stmt = db.prepare(sql);
       if (stmtCache.size >= MAX_STMT_CACHE_SIZE) {
         const oldestKey = stmtCache.keys().next().value;

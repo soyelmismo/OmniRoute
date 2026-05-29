@@ -2884,9 +2884,9 @@ export function getProviderById(id: string) {
 }
 
 export const AI_PROVIDERS = new Proxy({} as Record<string, any>, {
-  get(_, key: string) {
+  get(_, key) {
     if (key === "then") return undefined;
-    return getOrCreateAiProviders()[key];
+    return typeof key === "string" ? getOrCreateAiProviders()[key] : undefined;
   },
   ownKeys() {
     return Reflect.ownKeys(getOrCreateAiProviders());
@@ -2896,8 +2896,8 @@ export const AI_PROVIDERS = new Proxy({} as Record<string, any>, {
   },
   getOwnPropertyDescriptor(_, key) {
     const obj = getOrCreateAiProviders();
-    if (key in obj) {
-      return { configurable: true, enumerable: true, value: obj[key as string] };
+    if (typeof key === "string" && key in obj) {
+      return { configurable: true, enumerable: true, value: obj[key] };
     }
     return undefined;
   },
@@ -2954,8 +2954,8 @@ export function getProviderAlias(providerId: string): string {
 }
 
 export const ALIAS_TO_ID = new Proxy({} as Record<string, string>, {
-  get(_, key: string) {
-    return getOrCreateAliasToId()[key];
+  get(_, key) {
+    return typeof key === "string" ? getOrCreateAliasToId()[key] : undefined;
   },
   ownKeys() {
     return Reflect.ownKeys(getOrCreateAliasToId());
@@ -2965,16 +2965,16 @@ export const ALIAS_TO_ID = new Proxy({} as Record<string, string>, {
   },
   getOwnPropertyDescriptor(_, key) {
     const obj = getOrCreateAliasToId();
-    if (key in obj) {
-      return { configurable: true, enumerable: true, value: obj[key as string] };
+    if (typeof key === "string" && key in obj) {
+      return { configurable: true, enumerable: true, value: obj[key] };
     }
     return undefined;
   },
 });
 
 export const ID_TO_ALIAS = new Proxy({} as Record<string, string>, {
-  get(_, key: string) {
-    return getOrCreateIdToAlias()[key];
+  get(_, key) {
+    return typeof key === "string" ? getOrCreateIdToAlias()[key] : undefined;
   },
   ownKeys() {
     return Reflect.ownKeys(getOrCreateIdToAlias());
@@ -2984,8 +2984,8 @@ export const ID_TO_ALIAS = new Proxy({} as Record<string, string>, {
   },
   getOwnPropertyDescriptor(_, key) {
     const obj = getOrCreateIdToAlias();
-    if (key in obj) {
-      return { configurable: true, enumerable: true, value: obj[key as string] };
+    if (typeof key === "string" && key in obj) {
+      return { configurable: true, enumerable: true, value: obj[key] };
     }
     return undefined;
   },

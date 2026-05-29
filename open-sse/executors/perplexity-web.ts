@@ -579,7 +579,7 @@ function buildStreamingResponse(
           );
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
         } finally {
-          controller.close();
+          try { controller.close(); } catch {}
         }
       },
     },

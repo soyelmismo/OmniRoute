@@ -47,9 +47,13 @@ const _cleanupTimer = setInterval(() => {
   for (const [key, entry] of sessions) {
     if (now - entry.lastActive > SESSION_TTL_MS) {
       sessions.delete(key);
+      const keysToDelete: string[] = [];
       for (const [apiKeyId, sessionSet] of activeSessionsByKey) {
         sessionSet.delete(key);
-        if (sessionSet.size === 0) activeSessionsByKey.delete(apiKeyId);
+        if (sessionSet.size === 0) keysToDelete.push(apiKeyId);
+      }
+      for (const k of keysToDelete) {
+        activeSessionsByKey.delete(k);
       }
     }
   }
@@ -65,9 +69,13 @@ const _cleanupTimer = setInterval(() => {
     }
     if (oldestKey === null) break;
     sessions.delete(oldestKey);
+    const evictionKeys: string[] = [];
     for (const [apiKeyId, sessionSet] of activeSessionsByKey) {
       sessionSet.delete(oldestKey);
-      if (sessionSet.size === 0) activeSessionsByKey.delete(apiKeyId);
+      if (sessionSet.size === 0) evictionKeys.push(apiKeyId);
+    }
+    for (const k of evictionKeys) {
+      activeSessionsByKey.delete(k);
     }
   }
 }, 60_000);
