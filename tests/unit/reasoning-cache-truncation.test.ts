@@ -2,12 +2,6 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 
-// Mock the DB layer before importing the module under test.
-// The module calls setReasoningCache on import (auto-cleanup), so the mock
-// must be in place beforehand.
-const dbCalls: { method: string; args: unknown[] }[] = [];
-const dbStore = new Map<string, { reasoning: string; provider: string; model: string }>();
-
 let mod: typeof import("../../open-sse/services/reasoningCache.ts");
 
 try {
@@ -18,7 +12,6 @@ try {
 
 const { cacheReasoningByKey, lookupReasoning, clearReasoningCacheAll } = mod;
 
-// Helper: clear in-memory state between tests
 function reset() {
   clearReasoningCacheAll();
 }

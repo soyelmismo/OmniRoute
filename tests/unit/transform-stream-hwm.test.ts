@@ -29,12 +29,12 @@ function cleanupDb() {
 }
 
 const encoder = new TextEncoder();
-const decoder = new TextDecoder();
 
 async function collectStreamOutput(
   readable: ReadableStream<Uint8Array>,
   timeoutMs = 2000
 ): Promise<string> {
+  const decoder = new TextDecoder();
   const reader = readable.getReader();
   const chunks: string[] = [];
   const deadline = Date.now() + timeoutMs;

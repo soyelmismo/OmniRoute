@@ -542,10 +542,10 @@ function getOrCreateImageProviders(): Record<string, ImageProviderConfig> {
       { id: "hidream", name: "Hidream I1 Full" },
     ],
     supportedSizes: ["1024x1024", "1024x1280", "1280x1024"],
-    },
-    };
-  }
-  return _IMAGE_PROVIDERS;
+  },
+};
+}
+return _IMAGE_PROVIDERS;
 }
 
 export function getImageProviders(): Record<string, ImageProviderConfig> {

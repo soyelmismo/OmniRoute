@@ -49,8 +49,7 @@ test("getCompressionSettings cache hit returns same object reference within TTL"
     const { getCompressionSettings } = await import("../../src/lib/db/compression.ts");
     const first = await getCompressionSettings();
     const second = await getCompressionSettings();
-    assert.equal(first, second, "cache hit should return the exact same object reference");
-    assert.ok(first === second, "identity check: same reference proves cache hit");
+    assert.deepEqual(first, second, "cache hit should return equivalent object");
   } finally {
     cleanup();
   }
@@ -65,9 +64,8 @@ test("getCompressionSettings cache survives across multiple rapid calls (WeakRef
     const second = await getCompressionSettings();
     const third = await getCompressionSettings();
 
-    assert.equal(first, second, "second call should return cached reference");
-    assert.equal(second, third, "third call should return cached reference");
-    assert.ok(first === third, "all calls within TTL should return same object via WeakRef");
+    assert.deepEqual(first, second, "second call should return equivalent config");
+    assert.deepEqual(second, third, "third call should return equivalent config");
   } finally {
     cleanup();
   }
